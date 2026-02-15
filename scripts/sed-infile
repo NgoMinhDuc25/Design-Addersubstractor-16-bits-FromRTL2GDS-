@@ -1,0 +1,48 @@
+# infile -- sed script to transform cpu_16bit_top_innovus.mmmc.orig.tcl -> cpu_16bit_top_innovus.mmmc.mod.tcl
+
+# 0) Make the banner date line match the target (exact)
+s|^# Created by Genus(TM) Synthesis Solution 22\.12-s082_1 on .*|# Created by Genus(TM) Synthesis Solution 22.12-s082_1 on Sat Dec 20 08:09:28 +07 2025|
+
+# 1) Convert absolute library/tech paths to relative ../libraries
+s|/home/randy/pd_fresher_course/Lab4\.Synthesis/\.\./libraries/|../libraries/|g
+
+# 2) Convert Genus rc_corner options to Innovus/Common-UI style
+s/-T /-temperature /g
+s/-qx_tech_file /-qrc_tech /g
+
+s/-preRoute_res /-pre_route_res /g
+s/-preRoute_cap /-pre_route_cap /g
+s/-preRoute_clkres /-pre_route_clock_res /g
+s/-preRoute_clkcap /-pre_route_clock_cap /g
+
+s/-postRoute_res /-post_route_res /g
+s/-postRoute_cap /-post_route_cap /g
+s/-postRoute_xcap /-post_route_cross_cap /g
+s/-postRoute_clkres /-post_route_clock_res /g
+s/-postRoute_clkcap /-post_route_clock_cap /g
+
+# Remove clk xcap line entirely (not present in target)
+ /-postRoute_clkxcap/d
+
+# After deleting the last line, remove trailing "\" from the new last line
+ /-post_route_clock_cap/ s/[[:space:]]*\\$//
+
+# 3) Insert cond_timing before rc_corner header, leaving existing blank line above it
+ /^## rc_corner$/i\
+create_timing_condition -name cond_timing -library_sets { ls_of_ld_slow }
+ /^## rc_corner$/i\
+
+# 4) Convert delay corners to timing_condition based and insert cond_leakage
+s/-early_library_set { ls_of_ld_slow }/-early_timing_condition { cond_timing }/g
+s/-late_library_set { ls_of_ld_slow }/-late_timing_condition { cond_timing }/g
+s/-early_library_set { ls_of_ld_leakage }/-early_timing_condition { cond_leakage }/g
+s/-late_library_set { ls_of_ld_leakage }/-late_timing_condition { cond_leakage }/g
+
+# Insert a blank line + cond_leakage line + blank line before power delay corner
+ /^create_delay_corner -name default_emulate_power_delay_corner /i\
+\
+create_timing_condition -name cond_leakage -library_sets { ls_of_ld_leakage }
+ /^create_delay_corner -name default_emulate_power_delay_corner /i\
+
+# 5) Fix SDC path
+s|{ outputs/|{ ../Lab4.Synthesis/outputs/|g
